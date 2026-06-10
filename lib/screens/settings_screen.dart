@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' as excel;
 import '../services/database_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_state.dart';
@@ -34,11 +34,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (result == null || result.files.isEmpty) return;
 
       setState(() => _importing = true);
-      final path  = result.files.first.path!;
+      final path = result.files.first.path!;
       final bytes = await File(path).readAsBytes();
-      final xl    = Excel.decodeBytes(bytes);
+      final xl = excel.Excel.decodeBytes(bytes);
 
-      // Structure : feuille = famille, entête = sous-famille, cellules = machines
       final Map<String, Map<String, List<String>>> data = {};
 
       for (final sheetName in xl.tables.keys) {
@@ -47,7 +46,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final familyName = sheetName.trim();
         data[familyName] = {};
 
-        // Première ligne = entêtes (sous-familles)
         final headers = sheet.rows.first
             .map((c) => c?.value?.toString().trim() ?? '')
             .toList();
@@ -57,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (sfName.isEmpty) continue;
           data[familyName]![sfName] = [];
           for (int ri = 1; ri < sheet.rows.length; ri++) {
-            final row  = sheet.rows[ri];
+            final row = sheet.rows[ri];
             if (ci >= row.length) continue;
             final cell = row[ci]?.value?.toString().trim() ?? '';
             if (cell.isNotEmpty) data[familyName]![sfName]!.add(cell);
@@ -85,8 +83,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
-
-        // ── Compte ─────────────────────────────────────────────────────────
         _sectionTitle('👤  Compte'),
         SectionCard(child: Row(children: [
           Container(
@@ -107,8 +103,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ])),
         ])),
         const SizedBox(height: 24),
-
-        // ── Langue ─────────────────────────────────────────────────────────
         _sectionTitle('🌐  ${lang.t("language")}'),
         const SizedBox(height: 8),
         ..._langs.map((l) {
@@ -122,13 +116,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppTheme.accent.withOpacity(0.12)
-                    : AppTheme.card,
+                color: isActive ? AppTheme.accent.withOpacity(0.12) : AppTheme.card,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isActive ? AppTheme.accent : AppTheme.border,
-                  width: isActive ? 1.5 : 0.5)),
+                  width: isActive ? 1.5 : 0.5),
+              ),
               child: Row(children: [
                 Text(l['flag']!, style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: 14),
@@ -144,14 +137,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         }),
         const SizedBox(height: 24),
-
-        // ── Import Excel ───────────────────────────────────────────────────
         _sectionTitle('📥  ${lang.t("import_excel")}'),
         const SizedBox(height: 8),
         SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Format attendu :\n• Nom de la feuille = Famille\n• Ligne 1 = Sous-familles\n• Cellules = Noms des machines',
+              'Format attendu :
+• Nom de la feuille = Famille
+• Ligne 1 = Sous-familles
+• Cellules = Noms des machines',
               style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.6)),
             const SizedBox(height: 14),
             AppButton(
@@ -163,8 +157,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ])),
         const SizedBox(height: 24),
-
-        // ── À propos ───────────────────────────────────────────────────────
         _sectionTitle('ℹ️  À propos'),
         SectionCard(child: Column(children: [
           const Text('⛽', style: TextStyle(fontSize: 36)),
@@ -173,13 +165,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                   color: AppTheme.accent)),
           const SizedBox(height: 4),
-          const Text('Gestion de ravitaillement en gasoil\npour engins de chantier industriel',
+          const Text('Gestion de ravitaillement en gasoil
+pour engins de chantier industriel',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.5)),
         ])),
         const SizedBox(height: 24),
-
-        // Déconnexion
         AppButton(
           label: lang.t('logout'),
           color: AppTheme.danger,
