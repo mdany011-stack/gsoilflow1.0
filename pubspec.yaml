@@ -23,7 +23,7 @@ dependencies:
   path_provider: ^2.1.3
 
   # Partage fichiers
-   share_plus: ^12.0.2
+  share_plus: ^12.0.2
 
   # Excel import
   excel: ^4.0.3
