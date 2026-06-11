@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -18,7 +17,6 @@ class PdfService {
     // Couleurs
     final cPrimary = PdfColor.fromHex('0D1F3C');
     final cAccent  = PdfColor.fromHex('FA8C12');
-    final cSuccess = PdfColor.fromHex('21B35E');
     final cLight   = PdfColor.fromHex('F5F7FA');
     final cMuted   = PdfColor.fromHex('6B7A99');
     final cWhite   = PdfColors.white;
@@ -154,7 +152,7 @@ class PdfService {
                 (op['machine_name'] as String? ?? '—'),
                 '${(op['quantity'] as num?)?.toStringAsFixed(1) ?? "0"}',
                 '${(op['compteur_vol'] as num?)?.toStringAsFixed(1) ?? "0"}',
-              ], i.isEven ? cLight : PdfColors.white, fontSize: 7.5),
+              ], i.isEven ? cLight : PdfColors.white, fontSize: 7.5);
             }),
           ],
         ),
