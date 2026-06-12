@@ -127,7 +127,13 @@ class DatabaseService {
         where: 'id=?', whereArgs: [rows.first['id']]);
     return rows.first;
   }
+  Future<void> logoutUser(String username) async {
+    final d = await db;
+    await d.update('users', {'is_logged_in': 0},
+        where: 'LOWER(username)=?', whereArgs: [username.toLowerCase()]);
+    
   // ── Machines ─────────────────────────────────────────────────────────────
+  
   Future<List<Map<String, dynamic>>> getFamilies() async {
     final d = await db;
     return d.query('machine_families', orderBy: 'name');
