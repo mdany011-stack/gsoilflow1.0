@@ -95,34 +95,52 @@ class DatabaseService {
   }
 
   String _hash(String pwd) => sha256.convert(utf8.encode(pwd)).toString();
-
-  Future<bool> registerUser(String username, String password) async {
+Future<bool> registerUser(String username, String password) async {
     try {
       final d = await db;
-      final existing = await d.query('users',
-          where: 'LOWER(username)=?',
-          whereArgs: [username.trim().toLowerCase()]);
+      final u = username.trim();
+      final p = password.trim();
+      if (u.isEmpty || p.isEmpty) return false;
+      final existing = await d.rawQuery(
+        'SELECT id FROM users WHERE LOWER(username)=LOWER(?)', [u]);
       if (existing.isNotEmpty) return false;
       await d.insert('users', {
-        'username': username.trim(),
-        'password': _hash(password.trim()),
+        'username': u,
+        'password': _hash(p),
         'is_logged_in': 0,
       });
       return true;
-    } catch (_) { return false; }
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<Map<String, dynamic>?> loginUser(String username, String password) async {
-    final d = await db;
-    final rows = await d.query('users',
-        where: 'LOWER(username)=?',
-        whereArgs: [username.trim().toLowerCase()]);
-    if (rows.isEmpty) return null;
-    final storedHash = rows.first['password'] as String;
-    if (storedHash != _hash(password.trim())) return null;
-    await d.update('users', {'is_logged_in': 1},
-        where: 'id=?', whereArgs: [rows.first['id']]);
-    return rows.first;
+    try {
+      final d = await db;
+      final u = username.trim();
+      final p = password.trim();
+      if (u.isEmpty || p.isEmpty) return null;
+      final rows = await d.rawQuery(
+        'SELECT * FROM users WHERE LOWER(username)=LOWER(?)', [u]);
+      if (rows.isEmpty) return null;
+      final stored = rows.first['password'] as String;
+      if (stored != _hash(p)) return null;
+      final id = rows.first['id'] as int;
+      await d.rawUpdate('UPDATE users SET is_logged_in=1 WHERE id=?', [id]);
+      return rows.first;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> logoutUser(String username) async {
+    try {
+      final d = await db;
+      await d.rawUpdate(
+        'UPDATE users SET is_logged_in=0 WHERE LOWER(username)=LOWER(?)',
+        [username.trim()]);
+    } catch (e) {}
   }
 
   Future<void> logoutUser(String username) async {
