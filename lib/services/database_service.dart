@@ -25,33 +25,38 @@ class DatabaseService {
         await _createTables(db);
         await _seedMachines(db);
       },
+      onUpgrade: (db, oldV, newV) async {
+        await db.execute('DROP TABLE IF EXISTS operations');
+        await db.execute('DROP TABLE IF EXISTS shifts');
+        await db.execute('DROP TABLE IF EXISTS machines');
+        await db.execute('DROP TABLE IF EXISTS machine_subfamilies');
+        await db.execute('DROP TABLE IF EXISTS machine_families');
+        await db.execute('DROP TABLE IF EXISTS users');
+        await _createTables(db);
+        await _seedMachines(db);
+      },
     );
   }
 
-  // ── Tables ──────────────────────────────────────────────────────────────
   Future<void> _createTables(Database db) async {
     await db.execute('''CREATE TABLE users(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       is_logged_in INTEGER DEFAULT 0)''');
-
     await db.execute('''CREATE TABLE machine_families(
       code TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT DEFAULT "⚙️")''');
-
     await db.execute('''CREATE TABLE machine_subfamilies(
       code TEXT PRIMARY KEY,
       parent_code TEXT NOT NULL,
       name TEXT NOT NULL,
       icon TEXT DEFAULT "🔧")''');
-
     await db.execute('''CREATE TABLE machines(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       subfamily_code TEXT NOT NULL,
       name TEXT NOT NULL)''');
-
     await db.execute('''CREATE TABLE shifts(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL,
@@ -62,7 +67,6 @@ class DatabaseService {
       end_counter REAL,
       end_photo TEXT,
       status TEXT DEFAULT "open")''');
-
     await db.execute('''CREATE TABLE operations(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shift_id INTEGER NOT NULL,
@@ -76,30 +80,23 @@ class DatabaseService {
       timestamp TEXT DEFAULT (datetime("now","localtime")))''');
   }
 
-  // ── Seed machines ────────────────────────────────────────────────────────
   Future<void> _seedMachines(Database db) async {
     final batch = db.batch();
-
-    // Familles
     for (var f in _families) {
       batch.insert('machine_families', f, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
-    // Sous-familles
     for (var sf in _subfamilies) {
       batch.insert('machine_subfamilies', sf, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
-    // Machines
     for (var m in _machines) {
       batch.insert('machines', m, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }
 
-  // ── Auth ─────────────────────────────────────────────────────────────────
-  String _hash(String pwd) =>
-      sha256.convert(utf8.encode(pwd)).toString();
+  String _hash(String pwd) => sha256.convert(utf8.encode(pwd)).toString();
 
- Future<bool> registerUser(String username, String password) async {
+  Future<bool> registerUser(String username, String password) async {
     try {
       final d = await db;
       final existing = await d.query('users',
@@ -127,13 +124,13 @@ class DatabaseService {
         where: 'id=?', whereArgs: [rows.first['id']]);
     return rows.first;
   }
+
   Future<void> logoutUser(String username) async {
     final d = await db;
     await d.update('users', {'is_logged_in': 0},
         where: 'LOWER(username)=?', whereArgs: [username.toLowerCase()]);
-    
-  // ── Machines ─────────────────────────────────────────────────────────────
-  
+  }
+
   Future<List<Map<String, dynamic>>> getFamilies() async {
     final d = await db;
     return d.query('machine_families', orderBy: 'name');
@@ -151,19 +148,6 @@ class DatabaseService {
         where: 'subfamily_code=?', whereArgs: [subfamilyCode], orderBy: 'name');
   }
 
-  Future<List<Map<String, dynamic>>> searchMachines(String query) async {
-    final d = await db;
-    return d.rawQuery('''
-      SELECT m.*, s.name as subfamily_name, f.name as family_name
-      FROM machines m
-      JOIN machine_subfamilies s ON m.subfamily_code = s.code
-      JOIN machine_families f ON s.parent_code = f.code
-      WHERE m.name LIKE ?
-      ORDER BY m.name
-    ''', ['%$query%']);
-  }
-
-  // ── Shifts ────────────────────────────────────────────────────────────────
   Future<int> startShift(String username, double counter, String photo) async {
     final d = await db;
     return d.insert('shifts', {
@@ -200,7 +184,6 @@ class DatabaseService {
     return rows.isEmpty ? null : rows.first;
   }
 
-  // ── Operations ────────────────────────────────────────────────────────────
   Future<void> addOperation({
     required int    shiftId,
     required String familyName,
@@ -238,25 +221,27 @@ class DatabaseService {
     return rows.first;
   }
 
-  // ── Import Excel ──────────────────────────────────────────────────────────
   Future<int> importFromExcel(Map<String, Map<String, List<String>>> data) async {
     final d     = await db;
     final batch = d.batch();
     int count   = 0;
     for (final familyName in data.keys) {
-      final fCode = familyName.toUpperCase().replaceAll(' ', '_').substring(0, familyName.length.clamp(0, 20));
-      batch.insert('machine_families', {'code': fCode, 'name': familyName, 'icon': '⚙️'},
+      final fCode = familyName.toUpperCase().replaceAll(' ', '_').substring(
+          0, familyName.length.clamp(0, 20));
+      batch.insert('machine_families',
+          {'code': fCode, 'name': familyName, 'icon': '⚙️'},
           conflictAlgorithm: ConflictAlgorithm.ignore);
       final subfamilies = data[familyName]!;
       for (final sfName in subfamilies.keys) {
-        final sfCode = '${fCode}_${sfName.toUpperCase().replaceAll(' ', '_')}'.substring(0,
-            (fCode.length + sfName.length + 1).clamp(0, 30));
+        final sfCode = '\${fCode}_\${sfName.toUpperCase().replaceAll(' ', '_')}'.substring(
+            0, (fCode.length + sfName.length + 1).clamp(0, 30));
         batch.insert('machine_subfamilies',
             {'code': sfCode, 'parent_code': fCode, 'name': sfName, 'icon': '🔧'},
             conflictAlgorithm: ConflictAlgorithm.ignore);
         for (final mName in subfamilies[sfName]!) {
           if (mName.trim().isEmpty) continue;
-          batch.insert('machines', {'subfamily_code': sfCode, 'name': mName.trim()},
+          batch.insert('machines',
+              {'subfamily_code': sfCode, 'name': mName.trim()},
               conflictAlgorithm: ConflictAlgorithm.ignore);
           count++;
         }
@@ -267,9 +252,6 @@ class DatabaseService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DONNÉES MACHINES (depuis Excel fourni)
-// ═══════════════════════════════════════════════════════════════════════════
 final _families = [
   {'code': 'HEAVY_MACHINES',  'name': 'Engins Lourds',         'icon': '🏗️'},
   {'code': 'RENT_MACHINES',   'name': 'Machines de Location',  'icon': '🔑'},
