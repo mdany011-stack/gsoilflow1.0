@@ -20,7 +20,7 @@ class DatabaseService {
     final path   = join(dbPath, 'gsoilflow.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, v) async {
         await _createTables(db);
         await _seedMachines(db);
@@ -99,29 +99,34 @@ class DatabaseService {
   String _hash(String pwd) =>
       sha256.convert(utf8.encode(pwd)).toString();
 
-  Future<bool> registerUser(String username, String password) async {
+ Future<bool> registerUser(String username, String password) async {
     try {
       final d = await db;
-      await d.insert('users', {'username': username, 'password': _hash(password)});
+      final existing = await d.query('users',
+          where: 'LOWER(username)=?',
+          whereArgs: [username.trim().toLowerCase()]);
+      if (existing.isNotEmpty) return false;
+      await d.insert('users', {
+        'username': username.trim(),
+        'password': _hash(password.trim()),
+        'is_logged_in': 0,
+      });
       return true;
     } catch (_) { return false; }
   }
 
   Future<Map<String, dynamic>?> loginUser(String username, String password) async {
-    final d    = await db;
+    final d = await db;
     final rows = await d.query('users',
-        where: 'username=? AND password=?',
-        whereArgs: [username, _hash(password)]);
+        where: 'LOWER(username)=?',
+        whereArgs: [username.trim().toLowerCase()]);
     if (rows.isEmpty) return null;
-    await d.update('users', {'is_logged_in': 1}, where: 'username=?', whereArgs: [username]);
+    final storedHash = rows.first['password'] as String;
+    if (storedHash != _hash(password.trim())) return null;
+    await d.update('users', {'is_logged_in': 1},
+        where: 'id=?', whereArgs: [rows.first['id']]);
     return rows.first;
   }
-
-  Future<void> logoutUser(String username) async {
-    final d = await db;
-    await d.update('users', {'is_logged_in': 0}, where: 'username=?', whereArgs: [username]);
-  }
-
   // ── Machines ─────────────────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getFamilies() async {
     final d = await db;
