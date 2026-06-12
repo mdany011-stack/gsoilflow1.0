@@ -233,7 +233,7 @@ class DatabaseService {
           conflictAlgorithm: ConflictAlgorithm.ignore);
       final subfamilies = data[familyName]!;
       for (final sfName in subfamilies.keys) {
-        final sfCode = '\${fCode}_\${sfName.toUpperCase().replaceAll(' ', '_')}'.substring(
+        final sfCode = '${fCode}_${sfName.toUpperCase().replaceAll(RegExp(r'\s'), '_')}'.substring(
             0, (fCode.length + sfName.length + 1).clamp(0, 30));
         batch.insert('machine_subfamilies',
             {'code': sfCode, 'parent_code': fCode, 'name': sfName, 'icon': '🔧'},
